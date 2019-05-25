@@ -1114,8 +1114,8 @@ MODULE module_mp_nssl_2mom
       ltmp = lhlw
       ENDIF
     ELSEIF ( ipconc >= 6 ) THEN
-      write(0,*) 'NSSL microphysics has not been compiled for 3-moment. Sorry.'
-        STOP
+!     write(0,*) 'NSSL microphysics has not been compiled for 3-moment. Sorry.'
+!       STOP
       lccn = 9
       lnc = 10
       lnr = 11
