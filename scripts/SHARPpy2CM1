@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+import sys
+import pandas as pd
+import numpy as np
+import metpy.calc
+from metpy.units import units
+class CM1():
+   @classmethod
+   def init_sndfile(self, file_name):
+      # Open SHARPpy formatted sounding
+      col_names           = ['PRES', 'HGHT', 'TEMP', 'DWPT', 'WDIR', 'WSPD']
+      df                  = pd.read_fwf(file_name, delimiter=',', as_file_obj=False, skipfooter=1, skiprows=6, usecols=[0, 1, 2, 3, 4, 5], names=col_names)
+      print(len(df))
+      # Assign inital variables for conversion
+      self.PRES           = df['PRES'].values * units.hPa
+      self.HGHT           = df['HGHT'] - float(df['HGHT'][:1])
+      self.TEMP           = df['TEMP'].values * units.degC
+      self.DWPT           = df['DWPT']
+      self.WSPD           = df['WSPD'] * 0.514444
+      # Calculate potential temperature
+      self.TH             = metpy.calc.potential_temperature(self.PRES, self.TEMP)
+      # Calculate mixing ratio
+      self.E              = 6.11 * np.power(10, (7.5 * self.DWPT / (237.7 + self.DWPT)))
+      self.MIXR           = 621.97 * self.E/(df['PRES'] - self.E)
+      # Calculate X and Y axis wind speeds
+      self.UWND,self.VWND = metpy.calc.wind_components(self.WSPD * units("m/s"), np.deg2rad(df['WDIR']))
+      # Write output sounding
+      self.PSFC  = self.PRES.magnitude[:1]
+      self.THSFC = self.TH.magnitude[:1]
+      self.THTA  = self.TH.magnitude
+      self.QVSFC = self.MIXR[:1]
+      snd_file = open('input_sounding', 'w')
+      for idx1 in range(self.PSFC.shape[0]):
+          str1 = ""
+          for col1 in ['PSFC', 'THSFC', 'QVSFC']:
+              str1 += "   %10.10f   " % (self.__dict__[col1][idx1])
+          snd_file.write(str1[:-1] + "\n")
+
+      for idx2 in range(self.PRES.shape[0]):
+          str2 = ""
+          for col2 in ['HGHT', 'THTA', 'MIXR', 'UWND', 'VWND']:
+              str2 += "   %10.10f   " % (self.__dict__[col2][idx2])
+          snd_file.write(str2[:-1] + "\n")
+
+      snd_file.close()
+CM1.init_sndfile(sys.argv[1])
