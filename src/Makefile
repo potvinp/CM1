@@ -72,6 +72,12 @@
 #OPTS = -ffree-form -ffree-line-length-none -O2 -finline-functions
 #CPP  = cpp -C -P -traditional -Wno-invalid-pp-token -ffreestanding
 #-----------------------------------------------------------------------------
+#  multiple processors, shared memory (OpenMP), gnu compiler
+#FC = gfortran
+#OPTS = -ffree-form -ffree-line-length-none -O2 -finline-functions -fopenmp
+#CPP  = cpp -C -P -traditional -Wno-invalid-pp-token -ffreestanding
+#DM = -DMPI
+#-----------------------------------------------------------------------------
 #  multiple processors, distributed memory (MPI), gnu compiler
 #FC = mpif90
 #OPTS = -ffree-form -ffree-line-length-none -O2 -finline-functions
@@ -170,7 +176,10 @@ SRC   = constants.F \
 	oml.F \
 	module_ra_etc.F \
 	module_ra_rrtmg_lw.F \
-	module_ra_rrtmg_sw.F
+	module_ra_rrtmg_sw.F \
+	base_bss.F \
+	bss_tend.F
+
 
 OBJS = $(addsuffix .o, $(basename $(SRC)))
 
@@ -206,7 +215,7 @@ anelp.o: constants.o input.o misclibs.o bc.o poiss.o
 azimavg.o: input.o constants.o cm1libs.o
 base.o: constants.o input.o bc.o comm.o goddard.o cm1libs.o getcape.o
 bc.o: constants.o input.o
-cm1.o: constants.o input.o param.o base.o init3d.o misclibs.o solve.o diff2.o turb.o statpack.o writeout.o restart.o radiation_driver.o radtrns3d.o turbdiag.o azimavg.o hifrq.o parcel.o init_physics.o init_surface.o
+cm1.o: constants.o input.o param.o base.o init3d.o misclibs.o solve.o diff2.o turb.o statpack.o writeout.o restart.o radiation_driver.o radtrns3d.o turbdiag.o azimavg.o hifrq.o parcel.o init_physics.o init_surface.o base_bss.o bss_tend.o
 cm1libs.o: input.o constants.o
 comm.o: input.o bc.o
 diff2.o: constants.o input.o
@@ -226,7 +235,7 @@ module_mp_radar.o: module_ra_etc.o
 module_ra_rrtmg_lw.o: module_ra_etc.o
 module_ra_rrtmg_sw.o: module_ra_etc.o module_ra_rrtmg_lw.o
 morrison.o: input.o constants.o
-param.o: constants.o input.o init_terrain.o bc.o comm.o thompson.o morrison.o module_mp_nssl_2mom.o goddard.o lfoice.o
+param.o: constants.o input.o init_terrain.o bc.o comm.o thompson.o morrison.o module_mp_nssl_2mom.o goddard.o lfoice.o init3d.o
 parcel.o: constants.o input.o cm1libs.o bc.o comm.o writeout_nc.o
 pdef.o: input.o bc.o comm.o
 pdcomp.o: constants.o input.o adv.o poiss.o
@@ -248,3 +257,5 @@ turb.o: constants.o input.o bc.o comm.o sfcphys.o sfclay.o sfclayrev.o slab.o om
 turbdiag.o: constants.o input.o interp_routines.o cm1libs.o getcape.o
 writeout.o: constants.o input.o bc.o comm.o writeout_nc.o misclibs.o getcape.o
 writeout_nc.o: constants.o input.o
+base_bss.o: input.o constants.o bc.o comm.o goddard.o cm1libs.o getcape.o
+bss_tend.o: input.o constants.o bc.o comm.o goddard.o cm1libs.o getcape.o

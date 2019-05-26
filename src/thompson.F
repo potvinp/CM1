@@ -5620,7 +5620,7 @@ SUBROUTINE nl_get_write_thompson_tables ( id_id , write_thompson_tables )
   logical , INTENT(OUT) :: write_thompson_tables
   INTEGER id_id
 !!!  write_thompson_tables = model_config_rec%write_thompson_tables
-  write_thompson_tables = .false.
+  write_thompson_tables = .true.
   RETURN
 END SUBROUTINE nl_get_write_thompson_tables
 !--- cm1 ---!

@@ -40,6 +40,8 @@
       use parcel_module
       use init_physics_module
       use init_surface_module
+      use base_bss_module !add bss tend module
+      use bss_tend_module !add continuous bss module
 #ifdef MPI
       use mpi
 #endif
@@ -164,6 +166,30 @@
       real, dimension(:,:,:), allocatable :: ks1,ks2,kn1,kn2
       real, dimension(:,:,:,:), allocatable :: tw1,tw2,te1,te2
       real, dimension(:,:,:,:), allocatable :: ts1,ts2,tn1,tn2
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!Continuous BSS variables !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+      real bss_start, bss_end   !model run time to start/end BSS modification (in sec)
+      real sndg2time, sndg3time !times to implement second or third soundings (in sec)
+      integer windchange, thermochange   !flag to indicate changes to wind/thermo profile (on/off)
+
+      double precision, dimension(:,:,:), allocatable :: u_tend1,u_tend2
+      double precision, dimension(:,:,:), allocatable :: v_tend1,v_tend2
+
+      double precision, dimension(:,:,:), allocatable :: pi_tend1,pi_tend2
+      double precision, dimension(:,:,:), allocatable :: prs_tend1,prs_tend2
+      double precision, dimension(:,:,:), allocatable :: rho_tend1,rho_tend2
+      double precision, dimension(:,:,:), allocatable :: th_tend1,th_tend2
+      double precision, dimension(:,:,:), allocatable :: qv_tend1,qv_tend2
+ 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!! End BSS Variables !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
 
       ! arrays for elliptic solver:
       real, dimension(:,:,:),    allocatable :: cfb
@@ -796,6 +822,17 @@
                        vw31,vw32,ve31,ve32,vs31,vs32,vn31,vn32,         &
                        ww31,ww32,we31,we32,ws31,ws32,wn31,wn32)
 
+
+!------Initialize BSS start/end times (read in from namelist file)-------
+      bss_start = var1
+      bss_end = var2
+      sndg2time = var3
+      sndg3time = var4
+      windchange = var5
+      thermochange = var6
+!----------------------------------------------------------------------
+
+
       dbldt = dble(dt)
 
       allocate( reqs_q(rmp,numq) )
@@ -914,6 +951,42 @@
 
       allocate( thrd(ibb2:ibe2,jbb2:jbe2,kbb2:kbe2) )
       thrd = 0.0
+
+
+!------------------------------------------
+! Allocate BSS tendency variables
+!------------------------------------------
+
+      allocate(   u_tend1(ib:ie+1,jb:je,kb:ke) )
+      u_tend1 = 0.0
+      allocate(   v_tend1(ib:ie,jb:je+1,kb:ke) )
+      v_tend1 = 0.0
+      allocate(   u_tend2(ib:ie+1,jb:je,kb:ke) )
+      u_tend2 = 0.0
+      allocate(   v_tend2(ib:ie,jb:je+1,kb:ke) )
+      v_tend2 = 0.0
+
+      allocate(  pi_tend1(ib:ie,jb:je,kb:ke) )
+      pi_tend1 = 0.0
+      allocate(  pi_tend2(ib:ie,jb:je,kb:ke) )
+      pi_tend2 = 0.0
+      allocate( prs_tend1(ib:ie,jb:je,kb:ke) )
+      prs_tend1 = 0.0
+      allocate( prs_tend2(ib:ie,jb:je,kb:ke) )
+      prs_tend2 = 0.0
+      allocate( rho_tend1(ib:ie,jb:je,kb:ke) )
+      rho_tend1 = 0.0
+      allocate( rho_tend2(ib:ie,jb:je,kb:ke) )
+      rho_tend2 = 0.0
+      allocate(  th_tend1(ib:ie,jb:je,kb:ke) )
+      th_tend1 = 0.0
+      allocate(  th_tend2(ib:ie,jb:je,kb:ke) )
+      th_tend2 = 0.0
+      allocate(  qv_tend1(ib:ie,jb:je,kb:ke) )
+      qv_tend1 = 0.0
+      allocate(  qv_tend2(ib:ie,jb:je,kb:ke) )
+      qv_tend2 = 0.0
+!--------------------------------------------
 
       allocate( dum1(ib:ie,jb:je,kb:ke) )
       dum1 = 0.0
@@ -1809,6 +1882,20 @@
       call set_time_to_zero()
 
 !----------------------------------------------------------------------
+! For 'continuous' BSS, compute tendencies to apply to base-state
+!----------------------------------------------------------------------
+
+
+      if ((windchange.eq.1).or.(thermochange.eq.1)) then
+          call bss_tend(bss_start,bss_end,zh,sndg2time,sndg3time,    &
+                      windchange,thermochange,u_tend1,u_tend2,      &
+                      v_tend1,v_tend2,pi_tend1,pi_tend2,prs_tend1, &
+                      prs_tend2,rho_tend1,rho_tend2,th_tend1,       &
+                      th_tend2,qv_tend1,qv_tend2)
+      endif
+
+
+!----------------------------------------------------------------------
 !  Time loop
 
       if(timestats.ge.1)then
@@ -1975,6 +2062,36 @@
 122     format(1x,'cflmax,ksmax,dt,nsound:',2x,f6.4,2x,f6.4,2x,f9.4,2x,i3)
 
         if(timestats.ge.1) time_misc=time_misc+mytime()
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! New 'continuous' BSS implementation -- C.E. Davenport, April 2017
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        if((mtime.ge.bss_start).and.(mtime.le.bss_end))then
+
+           call base_bss(bss_start,bss_end,u0,v0,ua,va,th0,qv0,thv0,   &
+                      pi0,tha,qa,ppi,prs,prs0,rho,rho0,zh,c1,c2,       &
+                      rho0s,pi0s,prs0s,rth0s,rth0,qc0,qi0,rr0,rf0,rrf0,&
+                      mtime,sndg2time,sndg3time,windchange,            &
+                      thermochange,dt,                                 &
+                      u_tend1,u_tend2,v_tend1,v_tend2,pi_tend1,        &
+                      pi_tend2, prs_tend1,prs_tend2,rho_tend1,         &
+                      rho_tend2,th_tend1,th_tend2,qv_tend1,qv_tend2,   &
+                      reqs_u,reqs_v,reqs_s,nw1,nw2,ne1,ne2,sw1,sw2,se1,&
+                      se2,n3w1,n3w2,n3e1,n3e2,s3w1,s3w2,s3e1,s3e2,     &
+                      uw31,uw32,ue31,ue32,us31,us32,un31,un32,         &
+                      vw31,vw32,ve31,ve32,vs31,vs32,vn31,vn32,         &
+                      sw31,sw32,se31,se32,ss31,ss32,sn31,sn32)
+
+         end if 
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! End continuous BSS
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
 
         call     solve(nstep,rbufsz,num_soil_layers,                  &
                    dt,dtlast,mtime,dbldt,mass1,mass2,                 &

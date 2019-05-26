@@ -21,6 +21,7 @@
                        uw31,uw32,ue31,ue32,us31,us32,un31,un32,         &
                        vw31,vw32,ve31,ve32,vs31,vs32,vn31,vn32,         &
                        ww31,ww32,we31,we32,ws31,ws32,wn31,wn32)
+
       use input
       use constants
       use init_terrain_module
@@ -3384,7 +3385,7 @@
 !-----------------------------------------------------------------------
 
         ELSEIF ( ptype .eq. 29 ) THEN    ! 3-moment ZVDH scheme (with hail)
-
+          
           iice = 1    ! this means that ptype=27 is an ice scheme
           idm  = 1    ! this means that ptype=27 has at least one double moment
           idmplus = 1
